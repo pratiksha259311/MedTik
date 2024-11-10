@@ -191,4 +191,124 @@ if __name__ == '__main__':
 pip freeze > requirements.txt
 pip install -r requirements.txt
  git pull origin main  # or the appropriate branch name
+ 
+import streamlit as st
+from datetime import datetime, timedelta
+import pyttsx3
+from plyer import notification
+import time
+
+# Medicine class to manage medicine doses
+class Medicine:
+    def __init__(self, name, dose, times, quantity, start_date, duration_days):
+        self.name = name
+        self.dose = dose
+        self.times = times  # List of times to take medicine
+        self.quantity = quantity
+        self.start_date = start_date
+        self.end_date = start_date + timedelta(days=duration_days)
+        self.taken_times = {}
+
+    def take_medicine(self, time):
+        current_date = datetime.now().date()
+        
+        # Prevent double doses for the same day and time
+        if current_date in self.taken_times and time in self.taken_times[current_date]:
+            return f"Medicine {self.name} has already been taken at {time} today!"
+        
+        # Check if the time provided is valid for the medicine
+        if time not in self.times:
+            return f"Invalid time for {self.name}. Valid times are {', '.join(self.times)}."
+        
+        # If the medicine has available quantity, reduce it and mark as taken
+        if self.quantity > 0:
+            self.quantity -= 1
+            if current_date not in self.taken_times:
+                self.taken_times[current_date] = []
+            self.taken_times[current_date].append(time)
+            if set(self.taken_times[current_date]) == set(self.times):
+                return f"All doses for {self.name} have been taken for today."
+            return f"Time to take {self.name} ({self.dose}) at {time}. Remaining: {self.quantity} tablets."
+        else:
+            return f"{self.name} is out of stock!"
+
+# Streamlit UI and interaction
+def main():
+    st.title('MEDTIK - Medicine Reminder App')
+    st.markdown('Welcome to the **MEDTIK** Medicine Reminder App. This demo helps you keep track of your medication doses.')
+    
+    # Input fields for medicine details
+    medicine_name = st.text_input("Medicine Name", "Thyronorm 50 mg")
+    dose = st.text_input("Dose", "50 mg")
+    times = st.text_input("Times to Take (comma separated, 24-hour format)", "07:00, 13:30, 19:30")
+    start_date = st.date_input("Start Date", datetime(2024, 3, 4))
+    duration = st.number_input("Duration (Days)", 30, min_value=1)
+    quantity = st.number_input("Quantity (Tablets)", 120, min_value=1)
+
+    # Create medicine object on button click
+    if st.button('Create Medicine Reminder'):
+        times = times.split(",")  # Convert string to list of times
+        medicine = Medicine(medicine_name, dose, times, quantity, start_date, duration)
+        
+        # Display medicine details
+        st.write(f"Reminder set for **{medicine.name}** with doses at {', '.join(medicine.times)}.")
+
+        # Simulate checking for reminders
+        current_time = datetime.now().strftime("%H:%M")
+        st.write(f"Current time: {current_time}")
+
+        # Check if any dose is due
+        if current_time in medicine.times:
+            reminder_msg = medicine.take_medicine(current_time)
+            st.write(reminder_msg)
+
+            # Display notification and play text-to-speech
+            notification.notify(
+                title=f"MEDTIK Reminder: {medicine.name} at {current_time}",
+                message=reminder_msg,
+                timeout=10  # Duration of notification
+            )
+            pyttsx3.init().say(reminder_msg)
+            pyttsx3.init().runAndWait()
+
+        else:
+            st.write("No dose is due at this moment.")
+    
+    # Display reminders for previously added medicines
+    if 'medicines' not in st.session_state:
+        st.session_state.medicines = []
+
+    # Add a new medicine to session state
+    if st.button('Add Another Medicine'):
+        new_medicine = Medicine(
+            medicine_name, 
+            dose, 
+            times.split(','), 
+            quantity, 
+            start_date, 
+            duration
+        )
+        st.session_state.medicines.append(new_medicine)
+        st.write(f"{medicine_name} added to reminders!")
+    
+    # Display list of all medicines and their doses
+    if st.session_state.medicines:
+        st.subheader("Your Medicine Reminders:")
+        for med in st.session_state.medicines:
+            st.write(f"{med.name} ({med.dose}) - Times: {', '.join(med.times)} - Remaining: {med.quantity} tablets")
+            # Check if any dose is due for each medicine
+            current_time = datetime.now().strftime("%H:%M")
+            if current_time in med.times:
+                reminder_msg = med.take_medicine(current_time)
+                st.write(reminder_msg)
+                notification.notify(
+                    title=f"MEDTIK Reminder: {med.name} at {current_time}",
+                    message=reminder_msg,
+                    timeout=10
+                )
+                pyttsx3.init().say(reminder_msg)
+                pyttsx3.init().runAndWait()
+
+if __name__ == "__main__":
+    main()
 
