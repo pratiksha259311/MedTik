@@ -188,3 +188,7 @@ class MedicineReminderApp(App):
 
 if __name__ == '__main__':
     MedicineReminderApp().run()
+pip freeze > requirements.txt
+pip install -r requirements.txt
+ git pull origin main  # or the appropriate branch name
+
